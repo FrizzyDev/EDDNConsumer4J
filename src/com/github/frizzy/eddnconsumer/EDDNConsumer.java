@@ -9,6 +9,7 @@ import javax.swing.SwingUtilities;
 import java.io.File;
 import java.io.IOException;
 import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * @author Frizzy
@@ -18,7 +19,7 @@ import java.util.concurrent.LinkedBlockingQueue;
 public class EDDNConsumer {
 
     /**
-     *
+     * Logger.
      */
     private static final Logger LOGGER = LogManager.getLogger ( );
 
@@ -30,29 +31,30 @@ public class EDDNConsumer {
     /**
      * The UI portion of EDDNConsumer.
      */
-    private EDDNUI ui;
+    private final EDDNUI ui;
+
+    /**
+     * The EddnPump creates a zeromq socket and
+     * receives EDDN responses.
+     */
+    private final EddnPump pump;
+
+    /**
+     * The queue storing the EDDN responses.
+     */
+    private final LinkedBlockingQueue<String> queue;
 
     /**
      *
      */
-    private EddnPump pump;
-
-    /**
-     *
-     */
-    private LinkedBlockingQueue<String> queue;
-
-    /**
-     *
-     */
-    private boolean active = true;
+    private final AtomicBoolean active = new AtomicBoolean ( true );
 
     /**
      * Initializes EDDNConsumer.
      */
     private EDDNConsumer ( ) {
         ui = new EDDNUI ( );
-        File outLocation = selectLocation ();
+        File outLocation = selectLocation ( );
 
         if ( outLocation != null ) {
             exporter = new ResponseExporter ( outLocation );
@@ -72,11 +74,11 @@ public class EDDNConsumer {
      *
      */
     private File selectLocation ( ) {
-        File outLocation = ui.showFileChooser ();
+        File outLocation = ui.showFileChooser ( );
 
         if ( outLocation == null ) {
             ui.showErrorDialog ( "File outLocation cannot be null. Please select a folder." );
-            selectLocation ();
+            selectLocation ( );
         }
 
         return outLocation;
@@ -88,7 +90,6 @@ public class EDDNConsumer {
      * EddnPump threads are started.
      */
     private void startConsumer ( ) {
-
 
         ResponseListener listener = new ResponseListener ( ) {
             int received = 0; // Number of received responses
@@ -110,13 +111,18 @@ public class EDDNConsumer {
         pump.addResponseListener ( listener );
 
         Thread thread = new Thread ( ( ) -> {
-            while ( active ) {
+            while ( active.get ( ) ) {
                 LOGGER.info ( "Polled" );
                 try {
                     final String polled = queue.take ( );
 
                     try {
-                        exporter.export ( polled );
+                        String exportedPath = exporter.export ( polled );
+
+                        if ( !exportedPath.equals ( "No export" ) ) { //Double-ch-ecking to make sure the export was successful
+                            SwingUtilities.invokeLater ( ( ) -> ui.updateExported ( exportedPath ) );
+                        }
+
                     } catch ( IOException e ) {
                         LOGGER.error ( "An error occurred exporting a response.", e );
                         ui.showErrorDialog ( "An error occurred exporting a EDDN response." );
@@ -128,7 +134,10 @@ public class EDDNConsumer {
                     System.exit ( -1 );
                 }
 
-                if ( queue.isEmpty ( ) && !pump.getActive ( ) ) {
+                final boolean active = pump.getActive ( );
+
+                LOGGER.info ( "Pump state: {}. Now finishing up the exporting process.", active );
+                if ( queue.isEmpty ( ) && !active ) {
                     /*
                      * If pump is not active, that means YES_OPTION in the dialog
                      * was pressed. We need to exit as soon as the queue is empty and
@@ -136,7 +145,7 @@ public class EDDNConsumer {
                      */
                     LOGGER.info ( "Queue is empty and pump turned off, Exiting application." );
                     SwingUtilities.invokeLater ( ( ) -> {
-                        ui.showDoneDialog ();
+                        ui.showDoneDialog ( exporter.getTotalExported ( ) );
                         System.exit ( 0 );
                     } );
                 }

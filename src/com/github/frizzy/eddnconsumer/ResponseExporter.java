@@ -33,13 +33,18 @@ public class ResponseExporter {
     /**
      * The directory the response files are stored.
      */
-    private File outLocation;
+    private final File outLocation;
 
     /**
      * The gson json parser to determine the message event within the
      * json response.
      */
-    private Gson parser;
+    private final Gson parser;
+
+    /**
+     * Total exported responses.
+     */
+    private int totalExported = 0;
 
     /**
      * Constructs the ResponseExporter. Throws an IllegalArgumentException if the outLocation
@@ -63,8 +68,9 @@ public class ResponseExporter {
      * contains the event type.
      *
      * @throws IOException Thrown if createNewFile() or Files.writeString() fails.
+     * @return The path of the exported json file.
      */
-    public void export ( final String response ) throws IOException {
+    public String export ( final String response ) throws IOException {
         if ( outLocation.exists () ) {
             JsonObject object = parser.fromJson ( response, JsonObject.class );
             JsonObject message = object.getAsJsonObject ( "message" );
@@ -84,9 +90,22 @@ public class ResponseExporter {
                          * outputting the json object via gson cuts off the output in the file.
                          */
                         Files.writeString ( outFile.toPath (), response);
+                        totalExported++;
+                        return outFile.getAbsolutePath ();
+                    } else {
+                        LOGGER.warn ( "outFile: {} was not created", outFile );
                     }
                 }
             }
         }
+
+        return "No export";
+    }
+
+    /**
+     * Returns the total amount of responses exported to files.
+     */
+    public int getTotalExported ( ) {
+        return totalExported;
     }
 }

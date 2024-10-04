@@ -5,13 +5,12 @@ import org.apache.logging.log4j.Logger;
 import org.zeromq.ZContext;
 import org.zeromq.ZMQ;
 
-import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.Iterator;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.zip.DataFormatException;
 import java.util.zip.Inflater;
 
@@ -46,7 +45,7 @@ public class EddnPump extends Thread {
      * Boolean flag determining if the loop within the pump thread
      * should run.
      */
-    private boolean active = true;
+    private final AtomicBoolean active = new AtomicBoolean ( true );
 
     /**
      *
@@ -65,6 +64,7 @@ public class EddnPump extends Thread {
     /**
      * Removes the specified ResponseListener from the EddnPump listeners list.
      */
+    @SuppressWarnings ( "unused" )
     public void removeResponseListener ( final ResponseListener listener ) {
         synchronized ( listeners ) {
             listeners.remove ( listener );
@@ -75,7 +75,8 @@ public class EddnPump extends Thread {
      * Sets the active flag for the pump thread.
      */
     public void setActive ( boolean active ) {
-        this.active = active;
+        this.active.set ( active );
+        LOGGER.info ( "Set active flag to: {}", active );
     }
 
     /**
@@ -83,8 +84,8 @@ public class EddnPump extends Thread {
      * Note: If this returns false, it doesn't necessarily mean the thread is
      * not active.
      */
-    public boolean getActive ( ) {
-        return active;
+    public synchronized boolean getActive ( ) {
+        return active.get ();
     }
 
     /**
@@ -111,7 +112,7 @@ public class EddnPump extends Thread {
         poller.register ( client, ZMQ.Poller.POLLIN );
         byte[] output = new byte[ 256 * 1024 ];
 
-        while ( active ) {
+        while ( active.get () ) {
             LOGGER.info ( "Attempting to receive response" );
             int poll = poller.poll ( 10 );
             if ( poll == ZMQ.Poller.POLLIN ) {
@@ -146,6 +147,7 @@ public class EddnPump extends Thread {
             }
         }
 
-        client.disconnect ( RELAY );
+        boolean disconnected = client.disconnect ( RELAY );
+        LOGGER.info ( "Client disconnected status: {}", disconnected  );
     }
 }

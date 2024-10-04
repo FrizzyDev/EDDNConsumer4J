@@ -10,6 +10,7 @@ import java.awt.Color;
 import java.awt.Dimension;
 import java.io.File;
 import java.io.IOException;
+import java.util.Objects;
 
 /**
  * Controls the UI aspect of EDDNConsumer.
@@ -33,17 +34,17 @@ public class EDDNUI {
     /**
      * The String displayed as the title of the JOptionPane dialog.
      */
-    private final String dialogTitle = "Receiving EDDN responses";
+    private static final String dialogTitle = "Receiving EDDN responses";
 
     /**
      * The dialog option int value used for the JOptionPane dialog.
      */
-    private final int dialogOption = JOptionPane.YES_NO_OPTION;
+    private static final int dialogOption = JOptionPane.YES_NO_OPTION;
 
     /**
      * The dialog message type int value used for the JOptionPane dialog.
      */
-    private final int dialogType = JOptionPane.PLAIN_MESSAGE;
+    private static final int dialogType = JOptionPane.PLAIN_MESSAGE;
 
     /**
      * The EDDN icon displayed in the dialog.
@@ -59,6 +60,11 @@ public class EDDNUI {
      * The label that displays total responses received.
      */
     private final JLabel responsesLabel;
+
+    /**
+     * The label that displays the name of a recently exported response.
+     */
+    private final JLabel exportLabel;
 
     /**
      * The JEditorPane displayed as the message pane within the JOptionPane dialog.
@@ -81,13 +87,15 @@ public class EDDNUI {
         }
 
         try { //Try to load the dialog icon
-            dialogIcon = new ImageIcon ( ImageIO.read ( EDDNUI.class.getResource ( "/com/github/frizzy/eddnconsumer/Resources/16920010.png" ) ) );
+            dialogIcon = new ImageIcon ( ImageIO.read ( Objects.requireNonNull ( EDDNUI.class.getResource (
+                    "/com/github/frizzy/eddnconsumer/Resources/16920010.png" ) ) ) );
         } catch ( IOException e ) {
             LOGGER.error ( "Exception occurred loading icon.", e );
         }
 
         messagePaneContainer = new JPanel ( );
         responsesLabel = new JLabel ( "Responses Received: 0" ); //Default text
+        exportLabel = new JLabel ("Nothing exported yet");
         dialogMessagePane = new JTextArea ( );
         messagePaneScroller = new JScrollPane ( dialogMessagePane );
 
@@ -97,6 +105,7 @@ public class EDDNUI {
         messagePaneContainer.setSize ( new Dimension ( 700, 600 ) );
         messagePaneContainer.add ( responsesLabel, BorderLayout.PAGE_START );
         messagePaneContainer.add ( messagePaneScroller, BorderLayout.CENTER );
+        messagePaneContainer.add ( exportLabel, BorderLayout.PAGE_END );
 
         dialogMessagePane.setLineWrap ( false ); //We want each response to contain into their own line
         dialogMessagePane.setEditable ( false ); //Does not need to be editable
@@ -142,10 +151,18 @@ public class EDDNUI {
     }
 
     /**
-     * Displays the done dialog.
+     * Displays the done dialog and reports how many responses were exported.
      */
-    public void showDoneDialog ( ) {
-        JOptionPane.showMessageDialog ( null, "EDDNConsumer is all done. Application will now close", "All done!", JOptionPane.INFORMATION_MESSAGE );
+    public void showDoneDialog ( int totalExported) {
+        JOptionPane.showMessageDialog ( null, "EDDNConsumer is all done. Total responses exported: " + totalExported + "\n" +
+                "The application will now close.", "All done!", JOptionPane.INFORMATION_MESSAGE );
+    }
+
+    /**
+     * Updates the export label to the recently exported file name/path.
+     */
+    public void updateExported ( final String newExport ) {
+        exportLabel.setText ( "Exported: " + newExport );
     }
 
     /**
