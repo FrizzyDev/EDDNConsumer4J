@@ -8,6 +8,7 @@ import javax.swing.JOptionPane;
 import javax.swing.SwingUtilities;
 import java.io.File;
 import java.io.IOException;
+import java.time.LocalDateTime;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -42,7 +43,7 @@ public class EDDNConsumer {
     /**
      * The queue storing the EDDN responses.
      */
-    private final LinkedBlockingQueue<String> queue;
+    private final LinkedBlockingQueue< String > queue;
 
     /**
      *
@@ -112,48 +113,57 @@ public class EDDNConsumer {
 
         Thread thread = new Thread ( ( ) -> {
             while ( active.get ( ) ) {
-                LOGGER.info ( "Polled" );
+                //LOGGER.info ( "Polled" );
+
                 try {
                     final String polled = queue.take ( );
-
                     try {
                         String exportedPath = exporter.export ( polled );
 
-                        if ( !exportedPath.equals ( "No export" ) ) { //Double-ch-ecking to make sure the export was successful
-                            SwingUtilities.invokeLater ( ( ) -> ui.updateExported ( exportedPath ) );
+                        if ( !exportedPath.equals ( "No export" ) ) {//Double-checking to make sure the export was successful
+                            SwingUtilities.invokeLater ( ( ) -> {
+                                ui.updateExported ( "Exported: " + exportedPath );
+                            } );
+                        } else {
+                            System.out.println ( "Returned No export" );
+                        }
+
+                        if ( queue.isEmpty () ) {
+                            System.out.println ( "Queue is empty. You can stop the process." );
                         }
 
                     } catch ( IOException e ) {
-                        LOGGER.error ( "An error occurred exporting a response.", e );
+                        LOGGER.error ( "An error occurred exporting a response." , e );
                         ui.showErrorDialog ( "An error occurred exporting a EDDN response." );
                     }
 
                 } catch ( InterruptedException e ) {
-                    LOGGER.error ( "Exception", e );
+                    LOGGER.error ( "Exception" , e );
                     ui.showErrorDialog ( "An InterruptedException occurred polling the queue. \n Exiting application." );
                     System.exit ( -1 );
                 }
 
-                final boolean active = pump.getActive ( );
-
-                LOGGER.info ( "Pump state: {}. Now finishing up the exporting process.", active );
-                if ( queue.isEmpty ( ) && !active ) {
-                    /*
-                     * If pump is not active, that means YES_OPTION in the dialog
-                     * was pressed. We need to exit as soon as the queue is empty and
-                     * the exporter call finished.
-                     */
-                    LOGGER.info ( "Queue is empty and pump turned off, Exiting application." );
-                    SwingUtilities.invokeLater ( ( ) -> {
-                        ui.showDoneDialog ( exporter.getTotalExported ( ) );
-                        System.exit ( 0 );
-                    } );
-                }
+//                final boolean active = pump.getActive ( );
+//
+//                LOGGER.info ( "Pump state: {}. Now finishing up the exporting process." , active );
+//                if ( queue.isEmpty ( ) && !active ) {
+//                    /*
+//                     * If pump is not active, that means YES_OPTION in the dialog
+//                     * was pressed. We need to exit as soon as the queue is empty and
+//                     * the exporter call finished.
+//                     */
+//                    LOGGER.info ( "Queue is empty and pump turned off, Exiting application." );
+//                    SwingUtilities.invokeLater ( ( ) -> {
+//                        ui.showDoneDialog ( exporter.getTotalExported ( ) );
+//                        System.exit ( 0 );
+//                    } );
+//                }
             }
         } );
 
         pump.start ( );
         thread.start ( );
+
 
         SwingUtilities.invokeLater ( ( ) -> {
             int option = ui.showDialog ( );
